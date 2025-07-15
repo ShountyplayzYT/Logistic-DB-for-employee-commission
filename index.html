@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Employee Bonus Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #eef2f3, #cfd9df);
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 40px auto;
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      overflow-x: auto;
+      animation: fadeIn 0.6s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    h1, h2, h3 {
+      text-align: center;
+      color: #1e3a5f;
+      margin-bottom: 10px;
+    }
+    h1 {
+      font-size: 2.4rem;
+    }
+    h2 {
+      font-size: 1.8rem;
+    }
+    h3 {
+      font-size: 1.4rem;
+    }
+    form {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+    input, button, label {
+      font-size: 14px;
+    }
+    input, button {
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    input:focus {
+      outline: none;
+      border-color: #1e3a5f;
+      box-shadow: 0 0 4px rgba(30, 58, 95, 0.3);
+    }
+    button {
+      background: #1e3a5f;
+      color: white;
+      transition: background 0.3s ease, transform 0.2s;
+    }
+    button:hover {
+      background: #16304e;
+      transform: scale(1.02);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      word-break: break-word;
+    }
+    th, td {
+      padding: 12px 8px;
+      border-bottom: 1px solid #ddd;
+      text-align: center;
+      max-width: 200px;
+    }
+    th {
+      background: #f4f6f8;
+    }
+    .delete-btn {
+      background-color: #e74c3c;
+      border: none;
+      padding: 6px 10px;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .delete-btn:hover {
+      background-color: #c0392b;
+    }
+    .month-section {
+      margin-top: 50px;
+      animation: fadeIn 0.6s ease-in-out;
+    }
+    .review-btn {
+      margin-top: 30px;
+      text-align: center;
+    }
+    .review-btn button {
+      margin: 10px;
+    }
+    canvas {
+      max-width: 100%;
+      margin: 20px 0;
+    }
+    @media screen and (max-width: 768px) {
+      form {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Employee Load Tracker</h1>
+    <form id="empForm">
+      <input type="text" id="date" placeholder="Date (e.g., 7/7/25)" required>
+      <input type="text" id="name" placeholder="Name" required>
+      <input type="text" id="loads" placeholder="Load No." required>
+      <input type="text" id="lanes" placeholder="Lanes" required>
+      <input type="text" id="puDel" placeholder="PU-Del" required>
+      <input type="text" id="carrier" placeholder="Carrier" required>
+      <input type="text" id="number" placeholder="Number" required>
+      <input type="text" id="dispatcher" placeholder="Dispatcher" required>
+      <input type="number" id="dat" placeholder="DAT" required>
+      <input type="number" id="rate" placeholder="Rate" required>
+      <input type="number" id="targetRate" placeholder="Target Rate" required>
+      <label><input type="checkbox" id="loadWon"> Load Won?</label>
+      <label><input type="checkbox" id="newClient"> New Client Load?</label>
+      <input type="number" id="reimbursement" placeholder="Additional Reimbursement (₹)"  min="0">
+      <label><input type="checkbox" id="managerBonus"> Manager Additional Com?</label>
+
+      <button type="submit">Add Record</button>
+    </form>
+    <div class="review-btn">
+      <button onclick="showMonthReview()">📈 Show Monthly Review</button>
+      <div id="reviewOutput" class="month-section"></div>
+      <div class="review-btn">
+        <button onclick="clearAllData()" style="background-color: #c0392b;">🗑️ Delete All Data</button>
+      </div>
+      <div class="review-btn">
+  <button onclick="calculateManagerBonus()">🎯 Calculate Manager Bonus</button>
+</div>
+
+    </div>
+    <div id="monthSections"></div>
+  </div>
+
+  <script>
+    
+    function clearAllData() {
+      if (confirm("Are you sure you want to delete ALL data? This cannot be undone.")) {
+        localStorage.clear();
+        alert("All data has been deleted.");
+        location.reload();
+      }
+    }
+
+    let recordsByMonth = JSON.parse(localStorage.getItem("recordsByMonth")) || {};
+
+    function saveToStorage() {
+      localStorage.setItem("recordsByMonth", JSON.stringify(recordsByMonth));
+    }
+
+    function getMonthFromDate(dateStr) {
+      const parts = dateStr.split("/");
+      return parseInt(parts[1]);
+    }
+
+    function loadRecords() {
+      const container = document.getElementById("monthSections");
+      container.innerHTML = "";
+
+      for (const month in recordsByMonth) {
+        const section = document.createElement("div");
+        section.classList.add("month-section");
+
+        const heading = document.createElement("h2");
+        heading.textContent = `Month ${month}`;
+        section.appendChild(heading);
+
+        const aggregated = {};
+
+        const table = document.createElement("table");
+        const thead = document.createElement("thead");
+        thead.innerHTML = `
+          <tr>
+            <th>Date</th><th>Name</th><th>Load No.</th><th>Lanes</th><th>PU-Del</th>
+            <th>Carrier</th><th>Number</th><th>Dispatcher</th><th>DAT</th>
+            <th>Rate</th><th>Target Rate</th><th>Difference</th><th>Commission</th><th>Won?</th><th>New?</th><th>Reimburse</th>
+            <th>Action</th>
+          </tr>`;
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+
+        recordsByMonth[month].forEach((record, index) => {
+          const diff = record.targetRate - record.rate;
+          let commission = diff > 0 ? diff * 2 + 100 : 100;
+          if (record.loadWon) commission += 50;
+          if (record.newClient) commission += 500;
+          commission += record.reimbursement || 0;
+
+          if (!aggregated[record.name]) {
+            aggregated[record.name] = {
+              totalLoads: 0,
+              totalCommission: 0,
+              totalRate: 0
+            };
+          }
+          aggregated[record.name].totalLoads += 1;
+          aggregated[record.name].totalCommission += commission;
+          aggregated[record.name].totalRate += record.rate;
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${record.date}</td><td>${record.name}</td><td>${record.loads}</td><td>${record.lanes}</td>
+            <td>${record.puDel}</td><td>${record.carrier}</td><td>${record.number}</td><td>${record.dispatcher}</td>
+            <td>${record.dat}</td><td>${record.rate}</td><td>${record.targetRate}</td>
+            <td>${diff}</td><td>${commission}</td>
+            <td>${record.loadWon ? "✅" : "❌"}</td>
+            <td>${record.newClient ? "✅" : "❌"}</td>
+            <td>₹${record.reimbursement || 0}</td>
+            <td><button class="delete-btn" onclick="deleteRecord('${month}', ${index})">Delete</button></td>`;
+
+          tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        section.appendChild(table);
+
+        const summary = document.createElement("div");
+        summary.innerHTML = `<h3>Monthly Summary</h3>`;
+        const summaryTable = document.createElement("table");
+        summaryTable.innerHTML = `
+          <thead>
+            <tr><th>Name</th><th>Total Loads</th><th>Total Commission</th><th>Total Earned</th></tr>
+          </thead><tbody>
+            ${Object.entries(aggregated).map(([name, data]) => `
+              <tr>
+                <td>${name}</td>
+                <td>${data.totalLoads}</td>
+                <td>${data.totalCommission.toFixed(2)}</td>
+                <td>${data.totalRate.toFixed(2)}</td>
+              </tr>`).join("")}
+          </tbody>`;
+        summary.appendChild(summaryTable);
+        section.appendChild(summary);
+
+        container.appendChild(section);
+      }
+    }
+
+    function deleteRecord(month, index) {
+      recordsByMonth[month].splice(index, 1);
+      if (recordsByMonth[month].length === 0) {
+        delete recordsByMonth[month];
+      }
+      saveToStorage();
+      loadRecords();
+    }
+
+    document.getElementById("empForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const date = document.getElementById("date").value.trim();
+      const name = document.getElementById("name").value.trim();
+      const loads = document.getElementById("loads").value.trim();
+      const lanes = document.getElementById("lanes").value.trim();
+      const puDel = document.getElementById("puDel").value.trim();
+      const carrier = document.getElementById("carrier").value.trim();
+      const number = document.getElementById("number").value.trim();
+      const dispatcher = document.getElementById("dispatcher").value.trim();
+      const dat = parseFloat(document.getElementById("dat").value);
+      const rate = parseFloat(document.getElementById("rate").value);
+      const targetRate = parseFloat(document.getElementById("targetRate").value);
+      const loadWon = document.getElementById("loadWon").checked;
+      const newClient = document.getElementById("newClient").checked;
+      const reimbursement = parseFloat(document.getElementById("reimbursement").value) || 0;
+
+      const month = getMonthFromDate(date);
+      if (!recordsByMonth[month]) recordsByMonth[month] = [];
+
+      recordsByMonth[month].push({
+        date, name, loads, lanes, puDel, carrier, number, dispatcher,
+        dat, rate, targetRate, loadWon, newClient, reimbursement
+      });
+
+      saveToStorage();
+      loadRecords();
+      e.target.reset();
+    });
+
+    function showMonthReview() {
+  const month = prompt("Enter month number (1–12) to view report:");
+  const monthData = recordsByMonth[month];
+
+  if (!monthData || monthData.length === 0) {
+    alert("No data found for that month.");
+    return;
+  }
+
+  // Store data in localStorage
+  localStorage.setItem("reviewMonth", month);
+  localStorage.setItem("reviewMonthData", JSON.stringify(monthData));
+
+  // Open new tab
+  window.open("charts.html", "_blank");
+}
+  function calculateManagerBonus() {
+  const month = prompt("Enter month number (1-12) to calculate manager bonus:");
+  if (!recordsByMonth[month] || recordsByMonth[month].length === 0) {
+    return alert("No data found for that month.");
+  }
+
+  const managerName = prompt("Enter the manager's name (must match employee name):");
+  let baseCommissions = 0;
+  let managerRecordIndex = -1;
+
+  recordsByMonth[month].forEach((record, index) => {
+    const diff = record.targetRate - record.rate;
+    let base = diff > 0 ? diff * 2 + 100 : 100;
+
+    // Remove bonus portions
+
+    base -= record.reimbursement || 0;
+
+    if (record.name !== managerName) {
+      baseCommissions += base;
+    } else if (managerRecordIndex === -1) {
+      managerRecordIndex = index;
+    }
+  });
+
+  if (managerRecordIndex === -1) {
+    return alert("Manager name not found in records for that month.");
+  }
+
+  const managerBonus = baseCommissions * 0.15;
+
+  // Add the bonus to the manager's reimbursement field
+  recordsByMonth[month][managerRecordIndex].reimbursement =
+    (recordsByMonth[month][managerRecordIndex].reimbursement || 0) + managerBonus;
+
+  saveToStorage();
+  loadRecords();
+  alert(`₹${managerBonus.toFixed(2)} manager bonus added to ${managerName}'s record.`);
+}
+
+
+
+
+    loadRecords();
+  </script>
+</body>
+</html>

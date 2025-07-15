@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Monthly Charts</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    canvas { max-width: 100%; margin-bottom: 40px;  }
+    h1, h2 { color: #2a4d69; }
+    
+    
+  body {
+    font-family: sans-serif;
+    padding: 20px;
+  }
+  canvas {
+    width: 400px !important;
+    height: 200px !important;
+    max-width: 100%;
+    margin-bottom: 30px;
+  }
+</style>
+
+  </style>
+</head>
+<body>
+  <h1>Monthly Review</h1>
+  <div id="charts" class="charts"></div>
+
+  <script>
+    const month = localStorage.getItem("reviewMonth");
+    const monthData = JSON.parse(localStorage.getItem("reviewMonthData"));
+
+    if (!monthData || !Array.isArray(monthData)) {
+      document.body.innerHTML = "<p>No valid data found.</p>";
+      throw new Error("No data.");
+    }
+
+    document.querySelector("h1").textContent = `Month ${month} - Performance Charts`;
+
+    const groupedByDate = {};
+    const employeeSet = new Set();
+
+    monthData.forEach(r => {
+      if (!groupedByDate[r.name]) groupedByDate[r.name] = {};
+      if (!groupedByDate[r.name][r.date]) groupedByDate[r.name][r.date] = { loads: 0, commission: 0 };
+
+      groupedByDate[r.name][r.date].loads += 1;
+
+      const base = r.targetRate - r.rate;
+      let commission = base > 0 ? base * 2 + 100 : 100;
+      if (r.loadWon) commission += 50;
+      if (r.newClient) commission += 500;
+      commission += r.reimbursement || 0;
+
+      groupedByDate[r.name][r.date].commission += commission;
+      employeeSet.add(r.name);
+    });
+
+    employeeSet.forEach(name => {
+      const chartDiv = document.createElement("div");
+      chartDiv.innerHTML = `
+        <h2>📊 ${name}</h2>
+        <canvas id="loadChart-${name}"></canvas>
+        <canvas id="commissionChart-${name}"></canvas>
+      `;
+      document.getElementById("charts").appendChild(chartDiv);
+
+      const dates = Object.keys(groupedByDate[name]);
+      const loadData = dates.map(d => groupedByDate[name][d].loads);
+      const commissionData = dates.map(d => groupedByDate[name][d].commission);
+
+      const ctx1 = document.getElementById(`loadChart-${name}`).getContext("2d");
+      const ctx2 = document.getElementById(`commissionChart-${name}`).getContext("2d");
+
+      new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: dates,
+          datasets: [{
+            label: 'Loads per Day',
+            data: loadData,
+            backgroundColor: '#3498db'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: dates,
+          datasets: [{
+            label: 'Commission per Day',
+            data: commissionData,
+            backgroundColor: '#2ecc71'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } }
+        }
+      });
+    });
+  </script>
+</body>
+</html>
